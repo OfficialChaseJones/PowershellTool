@@ -28,6 +28,7 @@ class ToolParameter {
 
 
 $ToolOptions = @()
+$DefaultsHash = @{}
 
 #################################################################
 #This will look for files of the pattern "Config*.ps1"
@@ -44,8 +45,26 @@ ForEach($File in $LocalFiles)
     }
 }
 
+$DefaultsFilePath = "$PSScriptRoot\DefaultParameters.txt"
+
+if([System.IO.File]::Exists($DefaultsFilePath))
+{
+    Write-Host "Read Defaults"
+    
+    $json = Get-Content -Path $DefaultsFilePath -Raw 
+    $DefaultsHash = @{}
+    (ConvertFrom-Json $json).psobject.properties | Foreach { $DefaultsHash[$_.Name] = $_.Value }
+
+    Write-Host $DefaultsHash.Count
+}
+
 #################################################################
 $AddedControls = New-Object System.Collections.ArrayList
+
+Function SaveDefaults()
+{
+    $DefaultsHash | ConvertTo-JSON | Set-Content -Path $DefaultsFilePath
+}
 
 Function OnChangeDropDown()
 {
@@ -69,7 +88,7 @@ Function OnChangeDropDown()
         $ParametersLabel.Text =  "Specify Parameters"
 
         #Load Parameters
-        AddParameter $ParameterIndex $Param
+        AddParameter $ParameterIndex $Param $SelectedTool.Name
         $ParameterIndex++
     }
     $main_form.Refresh
@@ -88,7 +107,7 @@ Function RemoveOldControls
     $AddedControls = New-Object System.Collections.ArrayList
 }
 
-Function AddParameter($paramindex, $Param)
+Function AddParameter($paramindex, $Param,$SelectedToolName)
 {
     $Label = New-Object System.Windows.Forms.Label
     $Label.Text = $Param.Name
@@ -100,7 +119,20 @@ Function AddParameter($paramindex, $Param)
 
     $Textbox = New-Object System.Windows.Forms.TextBox
 
-    $Textbox.Text = $Param.DefaultValue
+    $HashKey = $SelectedToolName + "|" + $Param.Name
+    $DefaultOverride = $DefaultsHash[$HashKey]
+
+    Write-Host $HashKey
+    Write-Host $DefaultOverride
+
+    if($DefaultOverride -ne $null)
+    {
+        $Textbox.Text = $DefaultOverride
+    }
+    else {
+        $Textbox.Text = $Param.DefaultValue
+    }
+
     $Textbox.Location  = New-Object System.Drawing.Point(220,$y)
     $Textbox.Width = 300
     $Textbox.AutoSize = $true
@@ -194,6 +226,13 @@ $Button.Size = New-Object System.Drawing.Size(120,23)
 $Button.Text = "Execute"
 $main_form.Controls.Add($Button)
 
+$DefaultsButton = New-Object System.Windows.Forms.Button
+$DefaultsButton.Location = New-Object System.Drawing.Size(250,350)
+$DefaultsButton.Size = New-Object System.Drawing.Size(220,23)
+$DefaultsButton.Text = "Save These Parameters as Defaults"
+$main_form.Controls.Add($DefaultsButton)
+
+
 $Button.Add_Click(
     {
         $SelectedTool = getSelectedTool
@@ -203,13 +242,24 @@ $Button.Add_Click(
 
         $ParameterHash = @{}
 
+        $LogEntry = Get-Date -format 'u'
+        $LogEntry +="|"+$SelectedTool.Name
+
         ForEach($Param in $SelectedTool.Parameters)
         {
 
             $ParameterHash.Add($Param.Name,$Param.ControlPointer.Text)
+            
+            $ParameterLogSegment = $Param.Name + "=["+$Param.ControlPointer.Text+"]"
+
+            $LogEntry +="|"+$ParameterLogSegment
         }
 
         
+        
+        #Output to log
+        Add-Content "$PSScriptRoot\PowerShellTools.log" $LogEntry
+
         #HeyFunction "abc" "def"
         $functionToCall = $SelectedTool.function
         $output = invoke-expression  "$functionToCall `$ParameterHash"
@@ -218,5 +268,21 @@ $Button.Add_Click(
     }
 )
 
+
+$DefaultsButton.Add_Click(
+    {
+    #Todo use defaults when loading
+
+        $SelectedTool = getSelectedTool
+
+        ForEach($Param in $SelectedTool.Parameters)
+        {
+            $HashKey = $SelectedTool.Name + "|" + $Param.Name
+            $DefaultsHash.Remove($HashKey)
+            $DefaultsHash.Add($HashKey,$Param.ControlPointer.Text)
+        }
+        SaveDefaults
+    }
+)
 #Dispaly window
 $main_form.ShowDialog()
