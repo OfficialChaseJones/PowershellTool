@@ -1,4 +1,0 @@
-{
-    "Generate SQL Report|Output Location":  "D:\\Report_Output3.csv",
-    "Generate SQL Report|SQL Server":  "localhost\\SQLEXPRESS"
-}
