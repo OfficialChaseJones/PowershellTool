@@ -1,0 +1,1 @@
+PowerShell.exe -File PS_Tools.ps1 -ExecutionPolicy Bypass -WindowStyle Hidden -noProfile -noInteractive
