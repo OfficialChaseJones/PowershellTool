@@ -264,6 +264,8 @@ $Button.Add_Click(
         $functionToCall = $SelectedTool.function
         $output = invoke-expression  "$functionToCall `$ParameterHash"
 
+        Add-Content "$PSScriptRoot\PowerShellTools.log" "Result:$output"
+
         $ResultsLabel.Text = $output
     }
 )
